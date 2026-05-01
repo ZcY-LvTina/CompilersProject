@@ -38,3 +38,6 @@ target_link_libraries(test_scaffold PRIVATE compiler_core)
 target_include_directories(test_scaffold PRIVATE include)
 
 add_test(NAME scaffold_tests COMMAND test_scaffold)
+set_tests_properties(scaffold_tests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)

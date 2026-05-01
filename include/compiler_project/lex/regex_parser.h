@@ -5,7 +5,7 @@
 
 typedef struct {
     ResultBase base;
-    char data[128];
+    char data[512];
 } RegexResult;
 
 RegexResult cp_parse_regex(const char *regex_text);

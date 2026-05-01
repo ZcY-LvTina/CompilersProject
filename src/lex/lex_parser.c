@@ -21,6 +21,10 @@ static void trim(char *text) {
     text[end - start] = '\0';
 }
 
+static int has_capacity(int count, int limit) {
+    return count < limit;
+}
+
 LexSpecResult cp_parse_lex_spec(const char *path) {
     LexSpecResult result;
     char line[512];
@@ -49,6 +53,13 @@ LexSpecResult cp_parse_lex_spec(const char *path) {
         if (strncmp(raw, "%define", 7) == 0) {
             char key[64];
             char value[128];
+            if (!has_capacity(result.data.definition_count, CP_MAX_LEX_DEFINITIONS)) {
+                CompilerError error;
+                cp_make_error(&error, 1004, "Too many lex definitions", line_no, 1, "lex");
+                RESULT_FAILURE(&result.base, error);
+                fclose(file);
+                return result;
+            }
             if (sscanf(raw, "%%define %63s %127[^\n]", key, value) != 2) {
                 CompilerError error;
                 cp_make_error(&error, 1001, "Invalid %define syntax", line_no, 1, "lex");
@@ -65,6 +76,13 @@ LexSpecResult cp_parse_lex_spec(const char *path) {
         token = strtok(raw, " \t");
         if (token == NULL) {
             continue;
+        }
+        if (!has_capacity(result.data.rule_count, CP_MAX_LEX_RULES)) {
+            CompilerError error;
+            cp_make_error(&error, 1005, "Too many lex rules", line_no, 1, "lex");
+            RESULT_FAILURE(&result.base, error);
+            fclose(file);
+            return result;
         }
         snprintf(result.data.rules[result.data.rule_count].name, 64, "%s", token);
         token = strtok(NULL, " \t");
@@ -87,6 +105,7 @@ LexSpecResult cp_parse_lex_spec(const char *path) {
         snprintf(result.data.rules[result.data.rule_count].token_type, 32, "%s", token);
         token = strtok(NULL, " \t");
         result.data.rules[result.data.rule_count].skip = token != NULL && strcmp(token, "skip") == 0;
+        result.data.rules[result.data.rule_count].priority = result.data.rule_count;
         result.data.rule_count++;
     }
 
