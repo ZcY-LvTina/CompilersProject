@@ -16,6 +16,7 @@ typedef struct {
     char pattern[128];
     char token_type[32];
     int skip;
+    int priority;
 } LexRule;
 
 typedef struct {
