@@ -10,6 +10,8 @@ typedef struct {
     QuadrupleList data;
 } QuadrupleListResult;
 
+void cp_ir_list_init(QuadrupleList *list);
+int cp_ir_emit(QuadrupleList *list, IROp op, const char *arg1, const char *arg2, const char *result);
 QuadrupleListResult cp_build_ir(const ASTNode *ast);
 
 #endif
