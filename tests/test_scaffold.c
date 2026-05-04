@@ -2,13 +2,24 @@
 #include <string.h>
 
 #include "compiler_project/common/ast.h"
-#include "compiler_project/common/symbol.h"
+#include "compiler_project/common/ir.h"
 #include "compiler_project/lex/automata.h"
 #include "compiler_project/lex/lex_parser.h"
 #include "compiler_project/lex/lexer_runtime.h"
 #include "compiler_project/lex/regex_parser.h"
+#include "compiler_project/semantic/ir_builder.h"
+#include "compiler_project/semantic/semantic_action.h"
 #include "compiler_project/semantic/symbol_table.h"
+#include "compiler_project/semantic/type_checker.h"
 #include "compiler_project/yacc/yacc_parser.h"
+
+static void init_decl(ASTNode *decl, ASTNode *type, ASTNode *ident, const char *type_name, const char *name) {
+    cp_ast_init(decl, AST_DECLARATION, "declaration", "", 1, 1);
+    cp_ast_init(type, AST_TYPE_NAME, "type", type_name, 1, 1);
+    cp_ast_init(ident, AST_IDENTIFIER, "identifier", name, 1, 1);
+    cp_ast_add_child(decl, type);
+    cp_ast_add_child(decl, ident);
+}
 
 static void test_parse_lex_spec(void) {
     LexSpecResult result = cp_parse_lex_spec("samples/lex/minic.l");
@@ -81,10 +92,74 @@ static void test_symbol_table(void) {
     cp_symbol_table_init(&table);
     memset(&entry, 0, sizeof(entry));
     strcpy(entry.name, "sum");
-    strcpy(entry.category, "variable");
-    strcpy(entry.type_expr.name, "int");
+    entry.category = SYMBOL_VARIABLE;
+    cp_type_init_primitive(&entry.type_expr, TYPE_INT_T);
     assert(cp_symbol_table_insert(&table, &entry));
+    assert(cp_symbol_table_enter_scope(&table, SCOPE_BLOCK, "inner") >= 0);
     assert(cp_symbol_table_lookup(&table, "sum") != NULL);
+    cp_symbol_table_exit_scope(&table);
+    assert(cp_symbol_table_lookup(&table, "sum") != NULL);
+}
+
+static void test_semantic_pipeline(void) {
+    ASTNode program;
+    ASTNode decl;
+    ASTNode type;
+    ASTNode ident;
+    ASTNode literal;
+    SymbolTableResult symbols;
+    BoolResult type_ok;
+    QuadrupleListResult ir;
+
+    cp_ast_init(&program, AST_PROGRAM, "program", "", 1, 1);
+    init_decl(&decl, &type, &ident, "int", "sum");
+    cp_ast_init(&literal, AST_LITERAL, "literal", "12", 1, 10);
+    cp_ast_add_child(&decl, &literal);
+    cp_ast_add_child(&program, &decl);
+
+    symbols = cp_run_semantic_actions(&program);
+    assert(symbols.base.ok);
+    assert(symbols.data.scopes[0].count == 1);
+    assert(strcmp(symbols.data.scopes[0].entries[0].name, "sum") == 0);
+
+    type_ok = cp_check_types(&program);
+    assert(type_ok.base.ok);
+    assert(type_ok.data == 1);
+
+    ir = cp_build_ir(&program);
+    assert(ir.base.ok);
+    assert(ir.data.count == 1);
+    assert(ir.data.items[0].op == IR_ASSIGN);
+    assert(strcmp(ir.data.items[0].result, "sum") == 0);
+}
+
+static void test_type_error_assignment(void) {
+    ASTNode program;
+    ASTNode decl;
+    ASTNode type;
+    ASTNode ident;
+    ASTNode stmt;
+    ASTNode assign;
+    ASTNode lhs;
+    ASTNode rhs;
+    BoolResult type_ok;
+
+    cp_ast_init(&program, AST_PROGRAM, "program", "", 1, 1);
+    init_decl(&decl, &type, &ident, "int", "sum");
+    cp_ast_add_child(&program, &decl);
+
+    cp_ast_init(&stmt, AST_STATEMENT, "expr", "", 2, 1);
+    cp_ast_init(&assign, AST_EXPRESSION, "assign", "=", 2, 1);
+    cp_ast_init(&lhs, AST_IDENTIFIER, "identifier", "sum", 2, 1);
+    cp_ast_init(&rhs, AST_LITERAL, "literal", "3.14", 2, 7);
+    cp_ast_add_child(&assign, &lhs);
+    cp_ast_add_child(&assign, &rhs);
+    cp_ast_add_child(&stmt, &assign);
+    cp_ast_add_child(&program, &stmt);
+
+    type_ok = cp_check_types(&program);
+    assert(!type_ok.base.ok);
+    assert(type_ok.base.errors[0].code == 8001);
 }
 
 int main(void) {
@@ -96,5 +171,7 @@ int main(void) {
     test_regex_validation_and_dfa();
     test_parse_yacc_spec();
     test_symbol_table();
+    test_semantic_pipeline();
+    test_type_error_assignment();
     return 0;
 }
