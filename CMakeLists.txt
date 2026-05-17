@@ -37,7 +37,15 @@ add_executable(test_scaffold tests/test_scaffold.c)
 target_link_libraries(test_scaffold PRIVATE compiler_core)
 target_include_directories(test_scaffold PRIVATE include)
 
+add_executable(test_yacc tests/test_yacc.c)
+target_link_libraries(test_yacc PRIVATE compiler_core)
+target_include_directories(test_yacc PRIVATE include)
+
 add_test(NAME scaffold_tests COMMAND test_scaffold)
+add_test(NAME yacc_tests COMMAND test_yacc)
 set_tests_properties(scaffold_tests PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+)
+set_tests_properties(yacc_tests PROPERTIES
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 )

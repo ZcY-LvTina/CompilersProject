@@ -49,9 +49,11 @@ typedef struct {
 } DFAResult;
 
 NFAResult cp_build_nfa(const char *regex_ast, const char *token_kind);
+NFAResult cp_build_combined_nfa_from_lex_spec(const LexSpec *spec);
 DFAResult cp_determinize(const NFA *nfa);
 DFAResult cp_minimize_dfa(const DFA *dfa);
 DFAResult cp_build_dfa_from_lex_spec(const LexSpec *spec);
+void cp_dump_nfa_text(const NFA *nfa, char *buffer, int buffer_size);
 void cp_dump_dfa_text(const DFA *dfa, char *buffer, int buffer_size);
 
 #endif

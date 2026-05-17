@@ -10,9 +10,20 @@
 static TokenType coarse_type(const char *token_type) {
     if (strcmp(token_type, "ID") == 0) return TOKEN_IDENTIFIER;
     if (strcmp(token_type, "NUM") == 0) return TOKEN_INTEGER_LITERAL;
-    if (strcmp(token_type, "INT") == 0 || strcmp(token_type, "RETURN") == 0) return TOKEN_KEYWORD;
-    if (strcmp(token_type, "ASSIGN") == 0 || strcmp(token_type, "PLUS") == 0) return TOKEN_OPERATOR;
-    if (strcmp(token_type, "SEMI") == 0) return TOKEN_DELIMITER;
+    if (strcmp(token_type, "FLOAT_NUM") == 0) return TOKEN_FLOAT_LITERAL;
+    if (strcmp(token_type, "INT") == 0 || strcmp(token_type, "FLOAT") == 0
+        || strcmp(token_type, "VOID") == 0 || strcmp(token_type, "IF") == 0
+        || strcmp(token_type, "ELSE") == 0 || strcmp(token_type, "WHILE") == 0
+        || strcmp(token_type, "RETURN") == 0) return TOKEN_KEYWORD;
+    if (strcmp(token_type, "ASSIGN") == 0 || strcmp(token_type, "PLUS") == 0
+        || strcmp(token_type, "MINUS") == 0 || strcmp(token_type, "MUL") == 0
+        || strcmp(token_type, "DIV") == 0 || strcmp(token_type, "EQ") == 0
+        || strcmp(token_type, "NE") == 0 || strcmp(token_type, "LT") == 0
+        || strcmp(token_type, "LE") == 0 || strcmp(token_type, "GT") == 0
+        || strcmp(token_type, "GE") == 0) return TOKEN_OPERATOR;
+    if (strcmp(token_type, "SEMI") == 0 || strcmp(token_type, "COMMA") == 0
+        || strcmp(token_type, "LPAREN") == 0 || strcmp(token_type, "RPAREN") == 0
+        || strcmp(token_type, "LBRACE") == 0 || strcmp(token_type, "RBRACE") == 0) return TOKEN_DELIMITER;
     if (strcmp(token_type, "EOF") == 0) return TOKEN_END_OF_FILE;
     return TOKEN_UNKNOWN;
 }

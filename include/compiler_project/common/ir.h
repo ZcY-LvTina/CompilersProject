@@ -19,6 +19,8 @@ typedef enum {
     IR_IF_NE,
     IR_PARAM,
     IR_CALL,
+    IR_FUNC_BEGIN,
+    IR_FUNC_END,
     IR_RET,
     IR_LABEL,
     IR_LOAD,

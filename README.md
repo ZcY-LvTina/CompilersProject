@@ -18,10 +18,13 @@
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
+./build/compiler_project --lex samples/lex/minic.l --yacc samples/yacc/minic.y --input samples/src/ok/demo.mc --out output
 ./build/compiler_project check-layout
 ./build/compiler_project lex --spec samples/lex/minic.l --source samples/src/ok/demo.mc
 ./build/compiler_project yacc --spec samples/yacc/minic.y
+./build/compiler_project parse --lex-spec samples/lex/minic.l --yacc-spec samples/yacc/minic.y --source samples/src/ok/demo.mc
 ./build/compiler_project semantic --lex-spec samples/lex/minic.l --yacc-spec samples/yacc/minic.y --source samples/src/ok/demo.mc
+./build/compiler_project ir --lex-spec samples/lex/minic.l --yacc-spec samples/yacc/minic.y --source samples/src/ok/demo.mc
 ```
 
 ## 目录说明

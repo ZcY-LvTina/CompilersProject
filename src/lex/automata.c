@@ -564,21 +564,19 @@ DFAResult cp_minimize_dfa(const DFA *dfa) {
     return result;
 }
 
-DFAResult cp_build_dfa_from_lex_spec(const LexSpec *spec) {
+NFAResult cp_build_combined_nfa_from_lex_spec(const LexSpec *spec) {
+    NFAResult result;
     NFA combined;
-    DFAResult dfa;
-    DFAResult min_dfa;
     int i;
+    RESULT_SUCCESS(&result.base);
     init_nfa(&combined);
     combined.start_state = 0;
     combined.state_count = 1;
     if (spec == NULL) {
         CompilerError error;
-        RESULT_SUCCESS(&dfa.base);
-        init_dfa(&dfa.data);
         cp_make_error(&error, 2012, "Missing lex spec", -1, -1, "automata");
-        RESULT_FAILURE(&dfa.base, error);
-        return dfa;
+        RESULT_FAILURE(&result.base, error);
+        return result;
     }
     for (i = 0; i < spec->rule_count; ++i) {
         NFAResult rule = build_rule_nfa(
@@ -588,26 +586,65 @@ DFAResult cp_build_dfa_from_lex_spec(const LexSpec *spec) {
             spec->rules[i].priority
         );
         if (!rule.base.ok) {
-            RESULT_SUCCESS(&dfa.base);
-            init_dfa(&dfa.data);
-            RESULT_FAILURE(&dfa.base, rule.base.errors[0]);
-            return dfa;
+            RESULT_FAILURE(&result.base, rule.base.errors[0]);
+            return result;
         }
         if (!copy_rule_into_combined(&combined, &rule.data)) {
             CompilerError error;
-            RESULT_SUCCESS(&dfa.base);
-            init_dfa(&dfa.data);
             cp_make_error(&error, 2013, "Combined NFA is too large", -1, -1, "automata");
-            RESULT_FAILURE(&dfa.base, error);
-            return dfa;
+            RESULT_FAILURE(&result.base, error);
+            return result;
         }
     }
-    dfa = cp_determinize(&combined);
+    result.data = combined;
+    return result;
+}
+
+DFAResult cp_build_dfa_from_lex_spec(const LexSpec *spec) {
+    NFAResult combined = cp_build_combined_nfa_from_lex_spec(spec);
+    DFAResult dfa;
+    DFAResult min_dfa;
+    if (!combined.base.ok) {
+        RESULT_SUCCESS(&dfa.base);
+        init_dfa(&dfa.data);
+        RESULT_FAILURE(&dfa.base, combined.base.errors[0]);
+        return dfa;
+    }
+    dfa = cp_determinize(&combined.data);
     if (!dfa.base.ok) {
         return dfa;
     }
     min_dfa = cp_minimize_dfa(&dfa.data);
     return min_dfa;
+}
+
+void cp_dump_nfa_text(const NFA *nfa, char *buffer, int buffer_size) {
+    int i;
+    int used = 0;
+    if (buffer == NULL || buffer_size <= 0) {
+        return;
+    }
+    buffer[0] = '\0';
+    if (nfa == NULL) {
+        return;
+    }
+    used += snprintf(buffer + used, buffer_size - used, "start=%d states=%d transitions=%d\n", nfa->start_state, nfa->state_count, nfa->transition_count);
+    for (i = 0; i < nfa->transition_count && used < buffer_size; ++i) {
+        const AutomataTransition *t = &nfa->transitions[i];
+        if (t->epsilon) {
+            used += snprintf(buffer + used, buffer_size - used, "%d --eps--> %d\n", t->from, t->to);
+        } else if (t->min_char == t->max_char) {
+            used += snprintf(buffer + used, buffer_size - used, "%d --%c--> %d\n", t->from, t->min_char, t->to);
+        } else {
+            used += snprintf(buffer + used, buffer_size - used, "%d --[%c-%c]--> %d\n", t->from, t->min_char, t->max_char, t->to);
+        }
+    }
+    for (i = 0; i < nfa->state_count && used < buffer_size; ++i) {
+        if (nfa->accepts[i].accepting) {
+            used += snprintf(buffer + used, buffer_size - used, "accept state %d token=%s skip=%d priority=%d\n",
+                i, nfa->accepts[i].token_kind, nfa->accepts[i].skip, nfa->accepts[i].priority);
+        }
+    }
 }
 
 void cp_dump_dfa_text(const DFA *dfa, char *buffer, int buffer_size) {
