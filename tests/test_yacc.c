@@ -30,12 +30,84 @@ static TokenStream make_decl_tokens(void) {
     return stream;
 }
 
+static TokenStream make_function_tokens(void) {
+    TokenStream stream;
+    memset(&stream, 0, sizeof(stream));
+    add_token(&stream, "INT", "int", 1, 1);
+    add_token(&stream, "ID", "main", 1, 5);
+    add_token(&stream, "LPAREN", "(", 1, 9);
+    add_token(&stream, "RPAREN", ")", 1, 10);
+    add_token(&stream, "LBRACE", "{", 1, 12);
+    add_token(&stream, "INT", "int", 2, 5);
+    add_token(&stream, "ID", "sum", 2, 9);
+    add_token(&stream, "ASSIGN", "=", 2, 13);
+    add_token(&stream, "NUM", "1", 2, 15);
+    add_token(&stream, "PLUS", "+", 2, 17);
+    add_token(&stream, "NUM", "2", 2, 19);
+    add_token(&stream, "SEMI", ";", 2, 20);
+    add_token(&stream, "RETURN", "return", 3, 5);
+    add_token(&stream, "ID", "sum", 3, 12);
+    add_token(&stream, "SEMI", ";", 3, 15);
+    add_token(&stream, "RBRACE", "}", 4, 1);
+    add_token(&stream, "EOF", "", 4, 2);
+    return stream;
+}
+
+static TokenStream make_control_flow_tokens(void) {
+    TokenStream stream;
+    memset(&stream, 0, sizeof(stream));
+    add_token(&stream, "INT", "int", 1, 1);
+    add_token(&stream, "ID", "main", 1, 5);
+    add_token(&stream, "LPAREN", "(", 1, 9);
+    add_token(&stream, "RPAREN", ")", 1, 10);
+    add_token(&stream, "LBRACE", "{", 1, 12);
+    add_token(&stream, "INT", "int", 2, 5);
+    add_token(&stream, "ID", "sum", 2, 9);
+    add_token(&stream, "ASSIGN", "=", 2, 13);
+    add_token(&stream, "NUM", "1", 2, 15);
+    add_token(&stream, "SEMI", ";", 2, 16);
+    add_token(&stream, "WHILE", "while", 3, 5);
+    add_token(&stream, "LPAREN", "(", 3, 11);
+    add_token(&stream, "ID", "sum", 3, 12);
+    add_token(&stream, "LT", "<", 3, 16);
+    add_token(&stream, "NUM", "5", 3, 18);
+    add_token(&stream, "RPAREN", ")", 3, 19);
+    add_token(&stream, "LBRACE", "{", 3, 21);
+    add_token(&stream, "ID", "sum", 4, 9);
+    add_token(&stream, "ASSIGN", "=", 4, 13);
+    add_token(&stream, "ID", "sum", 4, 15);
+    add_token(&stream, "PLUS", "+", 4, 19);
+    add_token(&stream, "NUM", "1", 4, 21);
+    add_token(&stream, "SEMI", ";", 4, 22);
+    add_token(&stream, "RBRACE", "}", 5, 5);
+    add_token(&stream, "IF", "if", 6, 5);
+    add_token(&stream, "LPAREN", "(", 6, 8);
+    add_token(&stream, "ID", "sum", 6, 9);
+    add_token(&stream, "GE", ">=", 6, 13);
+    add_token(&stream, "NUM", "5", 6, 16);
+    add_token(&stream, "RPAREN", ")", 6, 17);
+    add_token(&stream, "LBRACE", "{", 6, 19);
+    add_token(&stream, "RETURN", "return", 7, 9);
+    add_token(&stream, "ID", "sum", 7, 16);
+    add_token(&stream, "SEMI", ";", 7, 19);
+    add_token(&stream, "RBRACE", "}", 8, 5);
+    add_token(&stream, "ELSE", "else", 8, 7);
+    add_token(&stream, "LBRACE", "{", 8, 12);
+    add_token(&stream, "RETURN", "return", 9, 9);
+    add_token(&stream, "NUM", "0", 9, 16);
+    add_token(&stream, "SEMI", ";", 9, 17);
+    add_token(&stream, "RBRACE", "}", 10, 5);
+    add_token(&stream, "RBRACE", "}", 11, 1);
+    add_token(&stream, "EOF", "", 11, 2);
+    return stream;
+}
+
 static void test_parse_yacc_spec(void) {
     GrammarResult result = cp_parse_yacc_spec("samples/yacc/minic.y");
     assert(result.base.ok);
     assert(strcmp(result.data.start_symbol, "program") == 0);
-    assert(result.data.production_count >= 4);
-    assert(result.data.token_count >= 7);
+    assert(result.data.production_count >= 20);
+    assert(result.data.token_count >= 16);
 }
 
 static void test_first_and_follow(void) {
@@ -86,6 +158,26 @@ static void test_parse_valid_program(void) {
     assert(parse.data.child_count == 1);
     assert(trace->step_count > 0);
     assert(trace->reduced_count > 0);
+    assert(strstr(trace->steps[0], "symbols=") != NULL);
+}
+
+static void test_parse_valid_function_program(void) {
+    GrammarResult grammar = cp_parse_yacc_spec("samples/yacc/minic.y");
+    TokenStream tokens = make_function_tokens();
+    ASTNodeResult parse = cp_parse_tokens(&grammar.data, &tokens);
+    assert(parse.base.ok);
+    assert(parse.data.child_count == 1);
+    assert(parse.data.children[0]->node_type == AST_FUNCTION_DEF);
+    assert(parse.data.children[0]->child_count == 4);
+}
+
+static void test_parse_control_flow_program(void) {
+    GrammarResult grammar = cp_parse_yacc_spec("samples/yacc/minic.y");
+    TokenStream tokens = make_control_flow_tokens();
+    ASTNodeResult parse = cp_parse_tokens(&grammar.data, &tokens);
+    assert(parse.base.ok);
+    assert(parse.data.child_count == 1);
+    assert(parse.data.children[0]->node_type == AST_FUNCTION_DEF);
 }
 
 static void test_parse_syntax_error(void) {
@@ -98,6 +190,8 @@ static void test_parse_syntax_error(void) {
     parse = cp_parse_tokens(&grammar.data, &stream);
     assert(!parse.base.ok);
     assert(parse.base.errors[0].code == 6002);
+    assert(strstr(parse.base.errors[0].message, "expected:") != NULL);
+    assert(strstr(parse.base.errors[0].message, "INT") != NULL);
 }
 
 static void test_parse_two_decls(void) {
@@ -126,6 +220,8 @@ int main(void) {
     test_first_and_follow();
     test_lr_table();
     test_parse_valid_program();
+    test_parse_valid_function_program();
+    test_parse_control_flow_program();
     test_parse_syntax_error();
     test_parse_two_decls();
     return 0;

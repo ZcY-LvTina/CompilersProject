@@ -17,6 +17,8 @@ const char *cp_ir_op_name(IROp op) {
         case IR_IF_NE: return "IF_NE";
         case IR_PARAM: return "PARAM";
         case IR_CALL: return "CALL";
+        case IR_FUNC_BEGIN: return "FUNC_BEGIN";
+        case IR_FUNC_END: return "FUNC_END";
         case IR_RET: return "RET";
         case IR_LABEL: return "LABEL";
         case IR_LOAD: return "LOAD";

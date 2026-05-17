@@ -11,6 +11,7 @@
 #include "compiler_project/semantic/semantic_action.h"
 #include "compiler_project/semantic/symbol_table.h"
 #include "compiler_project/semantic/type_checker.h"
+#include "compiler_project/yacc/parser_runtime.h"
 #include "compiler_project/yacc/yacc_parser.h"
 
 static void init_decl(ASTNode *decl, ASTNode *type, ASTNode *ident, const char *type_name, const char *name) {
@@ -133,6 +134,37 @@ static void test_semantic_pipeline(void) {
     assert(strcmp(ir.data.items[0].result, "sum") == 0);
 }
 
+static void test_full_pipeline_from_specs(void) {
+    LexSpecResult lex = cp_parse_lex_spec("samples/lex/minic.l");
+    GrammarResult grammar = cp_parse_yacc_spec("samples/yacc/minic.y");
+    TokenStreamResult tokens = cp_tokenize_source(&lex.data, "int inc(int x) { return x + 1; } int main() { int sum = 1 + 2; while (sum < 5) { sum = inc(sum); } if (sum >= 5) { sum = sum - 1; } else { sum = 0; } return sum; }");
+    ASTNodeResult ast = cp_parse_tokens(&grammar.data, &tokens.data);
+    SymbolTableResult symbols = cp_run_semantic_actions(&ast.data);
+    BoolResult type_ok = cp_check_types(&ast.data);
+    QuadrupleListResult ir = cp_build_ir(&ast.data);
+    int saw_param = 0;
+    int saw_call = 0;
+    int index;
+    assert(lex.base.ok);
+    assert(grammar.base.ok);
+    assert(tokens.base.ok);
+    assert(ast.base.ok);
+    assert(symbols.base.ok);
+    assert(type_ok.base.ok);
+    assert(ir.base.ok);
+    assert(symbols.data.scopes[0].count == 2);
+    assert(strcmp(symbols.data.scopes[0].entries[0].name, "inc") == 0);
+    assert(strcmp(symbols.data.scopes[0].entries[1].name, "main") == 0);
+    assert(ir.data.count >= 18);
+    assert(ir.data.items[0].op == IR_FUNC_BEGIN);
+    for (index = 0; index < ir.data.count; ++index) {
+        saw_param |= ir.data.items[index].op == IR_PARAM;
+        saw_call |= ir.data.items[index].op == IR_CALL;
+    }
+    assert(saw_param);
+    assert(saw_call);
+}
+
 static void test_type_error_assignment(void) {
     ASTNode program;
     ASTNode decl;
@@ -162,6 +194,21 @@ static void test_type_error_assignment(void) {
     assert(type_ok.base.errors[0].code == 8001);
 }
 
+static void test_function_call_argument_type_error(void) {
+    LexSpecResult lex = cp_parse_lex_spec("samples/lex/minic.l");
+    GrammarResult grammar = cp_parse_yacc_spec("samples/yacc/minic.y");
+    TokenStreamResult tokens = cp_tokenize_source(&lex.data, "int inc(int x) { return x; } void v; int main() { return inc(v); }");
+    ASTNodeResult ast = cp_parse_tokens(&grammar.data, &tokens.data);
+    BoolResult type_ok;
+    assert(lex.base.ok);
+    assert(grammar.base.ok);
+    assert(tokens.base.ok);
+    assert(ast.base.ok);
+    type_ok = cp_check_types(&ast.data);
+    assert(!type_ok.base.ok);
+    assert(type_ok.base.errors[0].code == 8009);
+}
+
 int main(void) {
     test_parse_lex_spec();
     test_tokenize_source();
@@ -172,6 +219,8 @@ int main(void) {
     test_parse_yacc_spec();
     test_symbol_table();
     test_semantic_pipeline();
+    test_full_pipeline_from_specs();
     test_type_error_assignment();
+    test_function_call_argument_type_error();
     return 0;
 }

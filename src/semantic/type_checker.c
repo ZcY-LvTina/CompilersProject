@@ -66,6 +66,18 @@ static TypeExpr *cp_shared_type_from_name(const char *name) {
 static TypeExpr cp_expr_type_internal(const ASTNode *expr, SymbolTable *table, TypeCheckContext *ctx);
 static int cp_check_node(const ASTNode *node, SymbolTable *table, TypeCheckContext *ctx, const TypeExpr *function_return_type);
 
+static int is_compare_expr(const ASTNode *expr) {
+    if (expr == NULL || expr->node_type != AST_EXPRESSION) {
+        return 0;
+    }
+    return strcmp(expr->symbol_name, "eq") == 0
+        || strcmp(expr->symbol_name, "ne") == 0
+        || strcmp(expr->symbol_name, "lt") == 0
+        || strcmp(expr->symbol_name, "le") == 0
+        || strcmp(expr->symbol_name, "gt") == 0
+        || strcmp(expr->symbol_name, "ge") == 0;
+}
+
 TypeExprResult cp_synthesize_expr_type(const ASTNode *expr, SymbolTable *table) {
     TypeExprResult result;
     TypeCheckContext ctx;
@@ -105,6 +117,7 @@ BoolResult cp_check_assignment(const ASTNode *lhs, const ASTNode *rhs, SymbolTab
 BoolResult cp_check_function_call(const ASTNode *call, SymbolTable *table) {
     BoolResult result;
     const SymbolEntry *entry;
+    int index;
     RESULT_SUCCESS(&result.base);
     result.data = 1;
     if (call == NULL || call->child_count <= 0 || call->children[0] == NULL) {
@@ -124,6 +137,27 @@ BoolResult cp_check_function_call(const ASTNode *call, SymbolTable *table) {
         RESULT_FAILURE(&result.base, error);
         result.data = 0;
         return result;
+    }
+    if (entry->type_expr.kind == TYPE_FUNCTION_T) {
+        for (index = 0; index < entry->type_expr.param_count; ++index) {
+            TypeCheckContext ctx;
+            TypeExpr arg_type;
+            TypeExpr *param_type = entry->type_expr.param_types[index];
+            memset(&ctx, 0, sizeof(ctx));
+            arg_type = cp_expr_type_internal(call->children[index + 1], table, &ctx);
+            if (ctx.has_error) {
+                RESULT_FAILURE(&result.base, ctx.error);
+                result.data = 0;
+                return result;
+            }
+            if (param_type != NULL && !cp_type_can_assign(param_type, &arg_type)) {
+                CompilerError error;
+                cp_make_error(&error, 8009, "function argument type mismatch", call->line, call->column, "semantic");
+                RESULT_FAILURE(&result.base, error);
+                result.data = 0;
+                return result;
+            }
+        }
     }
     return result;
 }
@@ -184,6 +218,17 @@ static TypeExpr cp_expr_type_internal(const ASTNode *expr, SymbolTable *table, T
                 } else {
                     cp_type_init_primitive(&result_type, TYPE_INT_T);
                 }
+                return result_type;
+            }
+            if (is_compare_expr(expr) && expr->child_count >= 2) {
+                lhs_type = cp_expr_type_internal(expr->children[0], table, ctx);
+                rhs_type = cp_expr_type_internal(expr->children[1], table, ctx);
+                if (!cp_type_is_numeric(&lhs_type) || !cp_type_is_numeric(&rhs_type)) {
+                    cp_set_type_error(ctx, 8003, expr, "comparison operands must be numeric");
+                    cp_type_init_error(&result_type);
+                    return result_type;
+                }
+                cp_type_init_primitive(&result_type, TYPE_BOOL_T);
                 return result_type;
             }
             if (strcmp(expr->symbol_name, "call") == 0) {
@@ -338,6 +383,28 @@ static int cp_check_node(const ASTNode *node, SymbolTable *table, TypeCheckConte
                     cp_expr_type_internal(node->children[0], table, ctx);
                 }
                 return !ctx->has_error;
+            }
+            if (strcmp(node->symbol_name, "if") == 0 && node->child_count >= 2) {
+                TypeExpr cond_type = cp_expr_type_internal(node->children[0], table, ctx);
+                if (!ctx->has_error && !cp_type_is_numeric(&cond_type)) {
+                    cp_set_type_error(ctx, 8007, node, "if condition must be numeric or boolean");
+                    return 0;
+                }
+                if (!cp_check_node(node->children[1], table, ctx, function_return_type)) {
+                    return 0;
+                }
+                if (node->child_count >= 3 && !cp_check_node(node->children[2], table, ctx, function_return_type)) {
+                    return 0;
+                }
+                return !ctx->has_error;
+            }
+            if (strcmp(node->symbol_name, "while") == 0 && node->child_count >= 2) {
+                TypeExpr cond_type = cp_expr_type_internal(node->children[0], table, ctx);
+                if (!ctx->has_error && !cp_type_is_numeric(&cond_type)) {
+                    cp_set_type_error(ctx, 8008, node, "while condition must be numeric or boolean");
+                    return 0;
+                }
+                return cp_check_node(node->children[1], table, ctx, function_return_type);
             }
             break;
         default:

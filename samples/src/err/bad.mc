@@ -1,2 +1,3 @@
-int = 12
-
+int main( {
+    return 1
+}
